@@ -5,13 +5,14 @@ GASでAPIを生やしてみる試み
 
 clasp + TypeScript で Google Apps Script の Web API を作る最小テンプレートです。
 
-Web App は Google アカウントでアクセスしたユーザーのメールアドレスを取得し、許可リストに含まれるユーザーだけにレスポンスを返します。
+Web App は Google アカウントでアクセスしたユーザーとして実行されます。DB として使う Google Spreadsheet を開けるユーザーだけが API を利用できます。
 
 ## 前提
 
 - ツール管理は mise に任せます。
 - Apps Script の実行ユーザー設定は `USER_ACCESSING` を使います。
-- Web App のアクセス設定は `ANYONE` です。実際には「Google アカウントを持つ全員」向けの公開になり、API 内部でメールアドレスを検証します。
+- Web App のアクセス設定は `ANYONE` です。実際には「Google アカウントを持つ全員」向けの公開になり、API 内部で Spreadsheet へのアクセス権を検証します。
+- API 利用者には、DB として使う Spreadsheet を共有してください。
 
 ## セットアップ
 
@@ -38,15 +39,20 @@ Apps Script プロジェクトを作成済みの場合は、`.clasp.example.json
 
 新規作成する場合は、Apps Script 側でプロジェクトを作成して script ID を取得し、同じく `.clasp.json` を作成してください。
 
-## 許可メールアドレス
+## DB Spreadsheet
 
-[src/main.ts](src/main.ts) の `ALLOWED_EMAILS` を編集します。
+[src/main.ts](src/main.ts) の `SPREADSHEET_ID` を編集します。
 
 ```ts
-const ALLOWED_EMAILS = new Set([
-  'allowed-user@example.com',
-]);
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID';
 ```
+
+この Spreadsheet の共有権限が、そのまま API の認可リストになります。
+
+- Spreadsheet を開けるユーザー: API 利用可能
+- Spreadsheet を開けないユーザー: `forbidden`
+
+API が Spreadsheet に書き込む場合、利用者には編集権限が必要です。直接 Spreadsheet を触れることも仕様として扱います。
 
 ## 開発
 
@@ -78,7 +84,7 @@ mise run open
 
 `GET` と `POST` に対応しています。
 
-未許可ユーザーの場合:
+Spreadsheet を開けないユーザーの場合:
 
 ```json
 {
@@ -87,12 +93,16 @@ mise run open
 }
 ```
 
-許可ユーザーの場合:
+Spreadsheet を開けるユーザーの場合:
 
 ```json
 {
   "ok": true,
-  "user": "allowed-user@example.com",
+  "user": "alice@example.com",
+  "spreadsheet": {
+    "id": "YOUR_SPREADSHEET_ID",
+    "name": "Ticket DB"
+  },
   "data": {
     "method": "POST",
     "body": {}

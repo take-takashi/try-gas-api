@@ -2,6 +2,10 @@ type ApiResponse =
   | {
       ok: true;
       user: string;
+      spreadsheet: {
+        id: string;
+        name: string;
+      };
       data: unknown;
     }
   | {
@@ -9,9 +13,7 @@ type ApiResponse =
       error: string;
     };
 
-const ALLOWED_EMAILS = new Set([
-  'allowed-user@example.com',
-]);
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID';
 
 function doGet(): GoogleAppsScript.Content.TextOutput {
   return handleRequest({ method: 'GET' });
@@ -28,9 +30,9 @@ function handleRequest(request: {
   method: 'GET' | 'POST';
   body?: unknown;
 }): GoogleAppsScript.Content.TextOutput {
-  const email = Session.getActiveUser().getEmail();
+  const spreadsheet = getAuthorizedSpreadsheet();
 
-  if (!email || !ALLOWED_EMAILS.has(email)) {
+  if (!spreadsheet) {
     return json({
       ok: false,
       error: 'forbidden',
@@ -39,12 +41,24 @@ function handleRequest(request: {
 
   return json({
     ok: true,
-    user: email,
+    user: Session.getActiveUser().getEmail(),
+    spreadsheet: {
+      id: spreadsheet.getId(),
+      name: spreadsheet.getName(),
+    },
     data: {
       method: request.method,
       body: request.body ?? null,
     },
   });
+}
+
+function getAuthorizedSpreadsheet(): GoogleAppsScript.Spreadsheet.Spreadsheet | null {
+  try {
+    return SpreadsheetApp.openById(SPREADSHEET_ID);
+  } catch {
+    return null;
+  }
 }
 
 function parseJson(value: string | undefined): unknown {
