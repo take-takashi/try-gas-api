@@ -1,0 +1,35 @@
+[tools]
+node = "24"
+pnpm = { version = "latest", dependencies = "node" }
+"npm:@google/clasp" = { version = "latest", dependencies = "node" }
+
+[tasks.install]
+description = "Node dependencies をインストールする"
+run = "pnpm install"
+
+[tasks.check]
+description = "TypeScript の型チェックを実行する"
+run = "pnpm exec tsc --noEmit"
+
+[tasks.build]
+description = "GAS に push する dist を生成する"
+depends = ["check"]
+run = "node scripts/build.mjs"
+
+[tasks.login]
+description = "clasp にログインする"
+run = "clasp login"
+
+[tasks.push]
+description = "ビルドして clasp push する"
+depends = ["build"]
+run = "clasp push"
+
+[tasks.deploy]
+description = "ビルドして Web App としてデプロイする"
+depends = ["build"]
+run = "clasp deploy"
+
+[tasks.open]
+description = "Apps Script エディタを開く"
+run = "clasp open"

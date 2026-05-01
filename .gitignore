@@ -70,6 +70,9 @@ web_modules/
 .env.*
 !.env.example
 
+# clasp local project settings
+.clasp.json
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
