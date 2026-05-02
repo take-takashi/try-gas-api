@@ -1,4 +1,27 @@
 import * as z from 'zod';
+import {
+  changeStatusSchema,
+  createCommentSchema,
+  createTicketSchema,
+  listTicketsQuerySchema,
+  matchRoute,
+  nextId,
+  normalizePath,
+  omitUndefined,
+  recordToRow,
+  rowToRecord,
+  ticketColumns,
+  ticketCommentColumns,
+  ticketCommentRowSchema,
+  ticketEventColumns,
+  ticketEventRowSchema,
+  ticketRowSchema,
+  updateTicketSchema,
+  type TicketCommentRow,
+  type TicketEventRow,
+  type TicketEventType,
+  type TicketRow,
+} from './ticket-core';
 
 declare const __SPREADSHEET_ID__: string;
 
@@ -10,155 +33,6 @@ const SHEET_NAMES = {
   events: 'ticket_events',
 } as const;
 
-const ticketStatuses = ['open', 'in_progress', 'review', 'done', 'closed'] as const;
-const ticketPriorities = ['low', 'medium', 'high', 'urgent'] as const;
-const ticketTypes = ['task', 'bug', 'feature'] as const;
-const ticketEventTypes = ['created', 'updated', 'commented', 'status_changed'] as const;
-
-const ticketStatusSchema = z.enum(ticketStatuses);
-const ticketPrioritySchema = z.enum(ticketPriorities);
-const ticketTypeSchema = z.enum(ticketTypes);
-const ticketEventTypeSchema = z.enum(ticketEventTypes);
-
-// zod schema と columns の組を Spreadsheet DB の正とする。
-// schema は API 入出力の型と値検証を、columns はシート上の列順を担う。
-const labelsSchema = z
-  .array(z.string().trim().min(1))
-  .default([])
-  .transform((labels) => Array.from(new Set(labels)));
-
-const nullableStringSchema = z
-  .union([z.string().trim(), z.null()])
-  .optional()
-  .transform((value) => {
-    if (value === undefined || value === null || value === '') {
-      return null;
-    }
-
-    return value;
-  });
-
-const optionalNullableStringSchema = z
-  .union([z.string().trim(), z.null()])
-  .optional()
-  .transform((value) => {
-    if (value === undefined) {
-      return undefined;
-    }
-
-    if (value === null || value === '') {
-      return null;
-    }
-
-    return value;
-  });
-
-const ticketRowSchema = z.object({
-  ticketId: z.string().min(1),
-  title: z.string().trim().min(1),
-  description: z.string(),
-  type: ticketTypeSchema,
-  status: ticketStatusSchema,
-  priority: ticketPrioritySchema,
-  assignee: z.string(),
-  labels: z.array(z.string()),
-  dueDate: z.string().nullable(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  archivedAt: z.string().nullable(),
-});
-
-const ticketColumns = [
-  'ticketId',
-  'title',
-  'description',
-  'type',
-  'status',
-  'priority',
-  'assignee',
-  'labels',
-  'dueDate',
-  'createdAt',
-  'updatedAt',
-  'archivedAt',
-] as const satisfies readonly (keyof z.infer<typeof ticketRowSchema>)[];
-
-const ticketCommentRowSchema = z.object({
-  commentId: z.string().min(1),
-  ticketId: z.string().min(1),
-  body: z.string().trim().min(1),
-  author: z.string(),
-  createdAt: z.string(),
-});
-
-const ticketCommentColumns = [
-  'commentId',
-  'ticketId',
-  'body',
-  'author',
-  'createdAt',
-] as const satisfies readonly (keyof z.infer<typeof ticketCommentRowSchema>)[];
-
-const ticketEventRowSchema = z.object({
-  eventId: z.string().min(1),
-  ticketId: z.string().min(1),
-  type: ticketEventTypeSchema,
-  actor: z.string(),
-  payload: z.unknown(),
-  createdAt: z.string(),
-});
-
-const ticketEventColumns = [
-  'eventId',
-  'ticketId',
-  'type',
-  'actor',
-  'payload',
-  'createdAt',
-] as const satisfies readonly (keyof z.infer<typeof ticketEventRowSchema>)[];
-
-const listTicketsQuerySchema = z.object({
-  status: ticketStatusSchema.optional(),
-  assignee: z.string().trim().optional(),
-  label: z.string().trim().optional(),
-  q: z.string().trim().optional(),
-});
-
-const createTicketSchema = z.object({
-  title: z.string().trim().min(1),
-  description: z.string().optional().default(''),
-  type: ticketTypeSchema.optional().default('task'),
-  priority: ticketPrioritySchema.optional().default('medium'),
-  assignee: z.string().optional().default(''),
-  labels: labelsSchema.optional().default([]),
-  dueDate: nullableStringSchema,
-});
-
-const updateTicketSchema = z
-  .object({
-    title: z.string().trim().min(1).optional(),
-    description: z.string().optional(),
-    type: ticketTypeSchema.optional(),
-    priority: ticketPrioritySchema.optional(),
-    assignee: z.string().optional(),
-    labels: labelsSchema.optional(),
-    dueDate: optionalNullableStringSchema,
-    archivedAt: optionalNullableStringSchema,
-  })
-  .strict();
-
-const createCommentSchema = z.object({
-  body: z.string().trim().min(1),
-});
-
-const changeStatusSchema = z.object({
-  status: ticketStatusSchema,
-});
-
-type TicketRow = z.infer<typeof ticketRowSchema>;
-type TicketCommentRow = z.infer<typeof ticketCommentRowSchema>;
-type TicketEventRow = z.infer<typeof ticketEventRowSchema>;
-type TicketEventType = z.infer<typeof ticketEventTypeSchema>;
 type ApiMethod = 'GET' | 'POST';
 
 type ApiSuccess<T> = {
@@ -542,57 +416,6 @@ function findTicketOrFail(
   throw new ApiError('not_found', 'Ticket が見つかりません');
 }
 
-function rowToRecord(columns: readonly string[], row: unknown[]): Record<string, unknown> {
-  return columns.reduce<Record<string, unknown>>((record, column, index) => {
-    record[column] = deserializeCell(column, row[index]);
-    return record;
-  }, {});
-}
-
-function recordToRow<T extends Record<string, unknown>>(
-  columns: readonly (keyof T & string)[],
-  record: T,
-): unknown[] {
-  return columns.map((column) => serializeCell(column, record[column]));
-}
-
-function omitUndefined<T extends Record<string, unknown>>(record: T): Partial<T> {
-  return Object.keys(record).reduce<Partial<T>>((result, key) => {
-    const typedKey = key as keyof T;
-
-    if (record[typedKey] !== undefined) {
-      result[typedKey] = record[typedKey];
-    }
-
-    return result;
-  }, {});
-}
-
-function serializeCell(column: string, value: unknown): unknown {
-  // Spreadsheet のセルは配列やオブジェクトを直接扱いにくいので、構造化データは JSON 文字列で保存する。
-  if (column === 'labels' || column === 'payload') {
-    return JSON.stringify(value ?? null);
-  }
-
-  return value ?? '';
-}
-
-function deserializeCell(column: string, value: unknown): unknown {
-  if (column === 'labels') {
-    return parseJsonArray(String(value || '[]'));
-  }
-
-  if (column === 'payload') {
-    return parseJsonValue(String(value || 'null'));
-  }
-
-  if ((column === 'dueDate' || column === 'archivedAt') && value === '') {
-    return null;
-  }
-
-  return value;
-}
-
 function readHeader(sheet: GoogleAppsScript.Spreadsheet.Sheet): string[] {
   if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
     return [];
@@ -622,17 +445,6 @@ function getSheetOrThrow(
   return sheet;
 }
 
-function nextId(existingIds: string[], prefix: 'TICKET' | 'COMMENT' | 'EVENT'): string {
-  // 行番号には依存せず、既存 ID の最大値から次の ID を採番する。
-  const nextNumber =
-    existingIds.reduce((max, id) => {
-      const match = new RegExp(`^${prefix}-(\\d+)$`).exec(id);
-      return match ? Math.max(max, Number(match[1])) : max;
-    }, 0) + 1;
-
-  return `${prefix}-${String(nextNumber).padStart(4, '0')}`;
-}
-
 function toRequest(method: ApiMethod, e: WebAppEvent): Request {
   return {
     method,
@@ -641,11 +453,6 @@ function toRequest(method: ApiMethod, e: WebAppEvent): Request {
     body: method === 'POST' ? parseJsonBody(e.postData?.contents) : null,
     userEmail: getUserEmail(),
   };
-}
-
-function normalizePath(pathInfo: string | undefined): string {
-  const path = (pathInfo ?? '').replace(/^\/+|\/+$/g, '');
-  return path ? `/${path}` : '/';
 }
 
 function normalizeQuery(parameter: Record<string, string | undefined>): Record<string, string> {
@@ -670,46 +477,6 @@ function parseJsonBody(value: string | undefined): unknown {
   } catch (error) {
     throw new ApiError('invalid_json', 'JSON を解析できません', errorMessage(error));
   }
-}
-
-function parseJsonArray(value: string): string[] {
-  const parsed = parseJsonValue(value);
-  return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
-}
-
-function parseJsonValue(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
-function matchRoute(path: string, pattern: string): Record<string, string> | null {
-  const pathParts = path.split('/').filter(Boolean);
-  const patternParts = pattern.split('/').filter(Boolean);
-
-  if (pathParts.length !== patternParts.length) {
-    return null;
-  }
-
-  const params: Record<string, string> = {};
-
-  for (let index = 0; index < patternParts.length; index += 1) {
-    const patternPart = patternParts[index];
-    const pathPart = pathParts[index];
-
-    if (patternPart.startsWith(':')) {
-      params[patternPart.slice(1)] = decodeURIComponent(pathPart);
-      continue;
-    }
-
-    if (patternPart !== pathPart) {
-      return null;
-    }
-  }
-
-  return params;
 }
 
 function getAuthorizedSpreadsheet(): GoogleAppsScript.Spreadsheet.Spreadsheet | null {
