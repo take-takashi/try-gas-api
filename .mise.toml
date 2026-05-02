@@ -37,7 +37,12 @@ depends = ["generate-clasp-config", "build"]
 run = "clasp push --force"
 
 [tasks.deploy]
-description = "ビルドして Web App としてデプロイする"
+description = "ビルドして既存 Web App デプロイを更新する"
+depends = ["generate-clasp-config", "build"]
+run = "dotenvx run -- node scripts/deploy.mjs"
+
+[tasks.deploy-new]
+description = "新しい Web App デプロイを作成する"
 depends = ["generate-clasp-config", "build"]
 run = "clasp deploy"
 
