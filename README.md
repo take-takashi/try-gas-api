@@ -29,11 +29,12 @@ clasp にログインします。
 mise run login
 ```
 
-Apps Script プロジェクトを作成済みの場合は、dotenvx で暗号化した `.env` に `CLASP_SCRIPT_ID` と `SPREADSHEET_ID` を設定してください。
+Apps Script プロジェクトを作成済みの場合は、dotenvx で暗号化した `.env` に `CLASP_SCRIPT_ID`、`SPREADSHEET_ID`、`CLASP_DEPLOYMENT_ID` を設定してください。
 
 ```env
 CLASP_SCRIPT_ID=YOUR_SCRIPT_ID
 SPREADSHEET_ID=YOUR_SPREADSHEET_ID
+CLASP_DEPLOYMENT_ID=YOUR_DEPLOYMENT_ID
 ```
 
 `.env` は暗号化して git 管理し、復号鍵を含む `.env.keys` は git 管理しません。
@@ -41,9 +42,10 @@ SPREADSHEET_ID=YOUR_SPREADSHEET_ID
 ```sh
 dotenvx set CLASP_SCRIPT_ID *****
 dotenvx set SPREADSHEET_ID *****
+dotenvx set CLASP_DEPLOYMENT_ID *****
 ```
 
-新規作成する場合は、Apps Script 側でプロジェクトを作成して script ID を取得し、同じく `.env` に設定してください。
+新規作成する場合は、Apps Script 側でプロジェクトを作成して script ID を取得し、同じく `.env` に設定してください。初回デプロイで `CLASP_DEPLOYMENT_ID` がまだない場合は `mise run deploy-new` を実行し、発行された deployment ID を `.env` に追加してください。
 
 `.clasp.json` は `.env` から生成されるローカルファイルです。
 
@@ -82,6 +84,14 @@ mise run push
 
 ```sh
 mise run deploy
+```
+
+`deploy` は `.env` の `CLASP_DEPLOYMENT_ID` を使って既存デプロイを更新します。Web App URL は変わりません。
+
+初回だけ新しいデプロイを作成する場合は次を使います。
+
+```sh
+mise run deploy-new
 ```
 
 Apps Script エディタを開きます。

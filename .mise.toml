@@ -18,6 +18,10 @@ run = "pnpm install"
 description = "TypeScript の型チェックを実行する"
 run = "pnpm exec tsc --noEmit"
 
+[tasks.test]
+description = "Node.js 上のユニットテストを実行する"
+run = "pnpm test"
+
 [tasks.build]
 description = "GAS に push する dist を生成する"
 depends = ["check"]
@@ -37,7 +41,12 @@ depends = ["generate-clasp-config", "build"]
 run = "clasp push --force"
 
 [tasks.deploy]
-description = "ビルドして Web App としてデプロイする"
+description = "ビルドして既存 Web App デプロイを更新する"
+depends = ["generate-clasp-config", "build"]
+run = "dotenvx run -- node scripts/deploy.mjs"
+
+[tasks.deploy-new]
+description = "新しい Web App デプロイを作成する"
 depends = ["generate-clasp-config", "build"]
 run = "clasp deploy"
 

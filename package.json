@@ -5,16 +5,21 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "TMPDIR=/tmp vitest run"
   },
   "devDependencies": {
     "@types/google-apps-script": "^1.0.99",
     "esbuild": "^0.25.0",
+    "vitest": "^4.0.0",
     "typescript": "^5.9.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
     ]
+  },
+  "dependencies": {
+    "zod": "^4.4.1"
   }
 }
