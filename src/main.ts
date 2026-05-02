@@ -13,7 +13,9 @@ type ApiResponse =
       error: string;
     };
 
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID';
+declare const __SPREADSHEET_ID__: string;
+
+const SPREADSHEET_ID = __SPREADSHEET_ID__;
 
 function doGet(): GoogleAppsScript.Content.TextOutput {
   return handleRequest({ method: 'GET' });

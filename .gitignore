@@ -65,10 +65,11 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variable files
-.env
+# dotenvx encrypted env file is committed
 .env.*
+!.env
 !.env.example
+.env.keys
 
 # clasp local project settings
 .clasp.json

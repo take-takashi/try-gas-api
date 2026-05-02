@@ -2,6 +2,13 @@
 node = "24"
 pnpm = { version = "latest", dependencies = "node" }
 "npm:@google/clasp" = { version = "latest", dependencies = "node" }
+dotenvx = "latest"
+
+[env]
+_.file = { path = ".env.keys", redact = true }
+
+[settings]
+lockfile = true
 
 [tasks.install]
 description = "Node dependencies をインストールする"
@@ -14,22 +21,27 @@ run = "pnpm exec tsc --noEmit"
 [tasks.build]
 description = "GAS に push する dist を生成する"
 depends = ["check"]
-run = "node scripts/build.mjs"
+run = "dotenvx run -- node scripts/build.mjs"
+
+[tasks.generate-clasp-config]
+description = ".env から .clasp.json を生成する"
+run = "dotenvx run -- node scripts/write-clasp-config.mjs"
 
 [tasks.login]
 description = "clasp にログインする"
 run = "clasp login"
 
 [tasks.push]
-description = "ビルドして clasp push する"
-depends = ["build"]
-run = "clasp push"
+description = "ビルドして clasp push --force する"
+depends = ["generate-clasp-config", "build"]
+run = "clasp push --force"
 
 [tasks.deploy]
 description = "ビルドして Web App としてデプロイする"
-depends = ["build"]
+depends = ["generate-clasp-config", "build"]
 run = "clasp deploy"
 
 [tasks.open]
 description = "Apps Script エディタを開く"
+depends = ["generate-clasp-config"]
 run = "clasp open"
