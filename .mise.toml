@@ -53,4 +53,8 @@ run = "clasp deploy"
 [tasks.open]
 description = "Apps Script エディタを開く"
 depends = ["generate-clasp-config"]
-run = "clasp open"
+run = "clasp open-script"
+
+[tasks.open-web-app]
+description = "デプロイ済み Web App を開く"
+run = "dotenvx run -- sh -c 'clasp open-web-app \"$CLASP_DEPLOYMENT_ID\"'"
