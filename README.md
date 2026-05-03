@@ -1,11 +1,14 @@
 # try-gas-api
-GASでAPIを生やしてみる試み
+
+GAS で API を生やしてみる試み
 
 ## 概要
 
-clasp + TypeScript で Google Apps Script の Web API を作る最小テンプレートです。
+clasp + TypeScript で Google Apps Script の Web API を作るプロジェクトです。
 
-Web App は Google アカウントでアクセスしたユーザーとして実行されます。DB として使う Google Spreadsheet を開けるユーザーだけが API を利用できます。
+Google Spreadsheet を簡易的なデータストアとして利用し、システム開発におけるチケット管理を API から操作できるようにします。
+
+現在の Web App は Google アカウントでアクセスしたユーザーとして実行されます。DB として使う Google Spreadsheet を開けるユーザーだけが API を利用できます。
 
 ## 前提
 
@@ -64,6 +67,35 @@ mise run generate-clasp-config
 
 API が Spreadsheet に書き込む場合、利用者には編集権限が必要です。直接 Spreadsheet を触れることも仕様として扱います。
 
+## 認可方式の選択肢
+
+現在は `src/appsscript.json` で `executeAs: USER_ACCESSING` を使い、Spreadsheet の共有権限を API の認可境界にしています。
+
+この方式では、ブラウザで Google ログイン済みのユーザーは扱いやすい一方で、Codex や `curl` などの CLI からは Google ログイン画面にリダイレクトされることがあります。Codex から API 経由でチケット操作を行うには、今後の認可方式を選ぶ必要があります。
+
+### 選択肢 1: Spreadsheet 共有権限を維持する
+
+- `executeAs: USER_ACCESSING` を維持します。
+- Spreadsheet を開けるユーザーだけが API を操作できます。
+- Google の権限管理と整合しやすいです。
+- Codex や素の `curl` からは扱いづらいです。
+
+### 選択肢 2: プロジェクト専用 API token を導入する
+
+- Web App をデプロイ実行者の権限で実行し、API token を知っている主体だけを許可します。
+- Codex や外部ツールから `curl` で扱いやすくなります。
+- Spreadsheet の共有者だけが操作できる、という制約は使わなくなります。
+- token を持つ主体は Spreadsheet 操作権限相当を持つため、token の保管、ローテーション、漏えい時の再発行が必要です。
+
+### 選択肢 3: Google OAuth を自前で検証する
+
+- Codex 側で Google OAuth token を取得し、GAS 側で token を検証して許可ユーザーと照合します。
+- Spreadsheet 共有権限に近い考え方を維持しやすいです。
+- 実装と運用がかなり重くなります。
+- GAS Web App は HTTP ステータスやヘッダー制御に制約があるため、一般的な Web API より扱いづらいです。
+
+当面の課題として、Codex からのチケット操作を優先する場合は「プロジェクト専用 API token」を導入するか、Google OAuth 検証を行うかを検討します。
+
 ## 開発
 
 型チェックとビルドを実行します。
@@ -102,32 +134,38 @@ mise run open
 
 ## API
 
-`GET` と `POST` に対応しています。
+現在の MVP では、チケットの作成、検索、詳細取得、更新、コメント追記、ステータス変更に対応しています。
+
+```txt
+GET  /tickets
+GET  /tickets/{ticketId}
+POST /tickets
+POST /tickets/{ticketId}
+POST /tickets/{ticketId}/comments
+POST /tickets/{ticketId}/status
+```
+
+Apps Script の `ContentService` では任意の HTTP ステータスコードを返せないため、成功・失敗は JSON 本文の `ok` と `error` で表現します。
 
 Spreadsheet を開けないユーザーの場合:
 
 ```json
 {
   "ok": false,
-  "error": "forbidden"
-}
-```
-
-Spreadsheet を開けるユーザーの場合:
-
-```json
-{
-  "ok": true,
-  "user": "alice@example.com",
-  "spreadsheet": {
-    "id": "YOUR_SPREADSHEET_ID",
-    "name": "Ticket DB"
-  },
-  "data": {
-    "method": "POST",
-    "body": {}
+  "error": {
+    "code": "forbidden",
+    "message": "Spreadsheet を開けません"
   }
 }
 ```
 
-Apps Script の `ContentService` では任意の HTTP ステータスコードを返せないため、拒否時も JSON 本文で `forbidden` を返します。
+チケット一覧の例:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "tickets": []
+  }
+}
+```
